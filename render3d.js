@@ -27,12 +27,21 @@ const pathCache=new Map();
 function tilePath(x,y,t){
  const c=center(x,y),[a,b]=ports(t),p=midpoint(c,a),q=midpoint(c,b);
  const curved=t.type==='curve60'||t.type==='curve120';
+ // Determine ramp direction from adjacent tile heights, not from port order.
+ let rampDirection=1;
+ if(t.type==='down'||t.type==='up'){
+  const offset=t.type==='down'?-1:1;
+  const neighborAt=side=>{const v=midpoint(c,side),delta={x:v.x-c.x,y:v.y-c.y},other={x:c.x+2*delta.x,y:c.y+2*delta.y};for(const [key,tile] of currentTiles){const [xx,yy]=key.split(',').map(Number),pos=center(xx,yy);if(Math.hypot(pos.x-other.x,pos.y-other.y)<1)return tile}return null};
+  const na=neighborAt(a),nb=neighborAt(b);
+  if(na?.z===t.z+offset&&nb?.z!==t.z+offset)rampDirection=-1;
+ }
+
  const pts=[];
  for(let i=0;i<=32;i++){const f=i/32;
  // Each port is the exact midpoint of a shared hex edge.
  const px=curved?(1-f)*(1-f)*p.x+2*(1-f)*f*c.x+f*f*q.x:p.x+(q.x-p.x)*f;
  const py=curved?(1-f)*(1-f)*p.y+2*(1-f)*f*c.y+f*f*q.y:p.y+(q.y-p.y)*f;
- const h=floorY(t.z)+9+(t.type==='down'?-15*f:t.type==='up'?15*f:0);
+ const rampF=rampDirection===1?f:1-f;const h=floorY(t.z)+9+(t.type==='down'?-15*rampF:t.type==='up'?15*rampF:0);
  pts.push(world({x:px,y:py},h));
  }
  return pts;
