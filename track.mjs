@@ -52,13 +52,57 @@ export function path(x, y, tile) {
   return {point, svg: `M${p.x} ${p.y} ${curved ? `C${h1.x} ${h1.y} ${h2.x} ${h2.y}` : 'L'} ${q.x} ${q.y}`};
 }
 
+function exampleTiles(pieces) {
+  return new Map(pieces.map(([x, y, type, rot, z], index) =>
+    [key(x, y), {type, rot, z, locked: index === 0}]));
+}
+
 export function example() {
-  return new Map([
+  return exampleTiles([
     [1, 3, 'down', 3, 2], [2, 4, 'straight', 3, 1],
     [3, 4, 'curve120', 1, 1], [3, 5, 'curve120', 4, 1],
     [4, 6, 'down', 3, 1], [5, 6, 'straight', 3, 0],
     [6, 7, 'end', 3, 0],
-  ].map(([x, y, type, rot, z], index) => [key(x, y), {type, rot, z, locked: index === 0}]));
+  ]);
+}
+
+export function tallExample() {
+  return exampleTiles([
+    [1, 3, 'down', 3, 12],
+    [2, 4, 'down', 3, 11],
+    [3, 4, 'curve60', 3, 10],
+    [3, 3, 'down', 1, 10],
+    [3, 2, 'down', 1, 9],
+    [3, 1, 'straight', 1, 8],
+    [3, 0, 'curve60', 0, 8],
+    [4, 1, 'curve120', 1, 8],
+    [4, 2, 'down', 4, 8],
+    [4, 3, 'down', 4, 7],
+    [4, 4, 'down', 4, 6],
+    [4, 5, 'straight', 4, 5],
+    [4, 6, 'down', 4, 5],
+    [4, 7, 'curve60', 4, 4],
+    [5, 6, 'curve120', 2, 4],
+    [5, 5, 'down', 1, 4],
+    [5, 4, 'up', 1, 3],
+    [5, 3, 'down', 1, 4],
+    [5, 2, 'straight', 1, 3],
+    [5, 1, 'curve60', 0, 3],
+    [6, 2, 'curve120', 1, 3],
+    [6, 3, 'straight', 4, 3],
+    [6, 4, 'down', 4, 3],
+    [6, 5, 'straight', 4, 2],
+    [6, 6, 'down', 4, 2],
+    [6, 7, 'curve60', 4, 1],
+    [7, 6, 'straight', 2, 1],
+    [8, 6, 'curve120', 0, 1],
+    [9, 6, 'straight', 3, 1],
+    [10, 7, 'curve60', 3, 1],
+    [10, 6, 'down', 1, 1],
+    [10, 5, 'straight', 1, 0],
+    [10, 4, 'straight', 1, 0],
+    [10, 3, 'end', 1, 0],
+  ]);
 }
 
 export function simulate(tiles) {

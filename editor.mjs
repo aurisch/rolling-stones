@@ -1,4 +1,4 @@
-import {center, columns, example, key, path, rows, simulate, start, vertex, rise} from './track.mjs';
+import {center, columns, example, key, path, rows, simulate, start, tallExample, vertex, rise} from './track.mjs';
 
 const $ = id => document.getElementById(id);
 const board = $('board');
@@ -12,7 +12,9 @@ const colors = {support: '#bdc9bd', end: '#85d3a4', down: '#ffda85', up: '#ffda8
 const startKey = key(...start);
 const storageKey = 'rolling-stones-v1';
 const savedTypes = new Set(types.slice(1, -1).map(([type]) => type));
-let tiles = example();
+const openTallExample = new URLSearchParams(location.search).get('bahn') === 'hoch';
+const tallExampleNotice = 'Die hohe Beispielbahn startet auf Ebene 12. Drück auf ▶.';
+let tiles = openTallExample ? tallExample() : example();
 let selection = null;
 let tool = 'straight';
 let rotation = 0;
@@ -199,6 +201,7 @@ function replace(next, message) {
   notice(message);
 }
 $('clear').onclick = () => replace(example(), 'Die Beispielbahn ist bereit.');
+$('tall').onclick = () => replace(tallExample(), tallExampleNotice);
 $('empty').onclick = () => replace(new Map([[startKey, example().get(startKey)]]), 'Setz das erste Bauteil hinter den Start.');
 $('save').onclick = () => {
   try {
@@ -250,3 +253,4 @@ $('toggle3d').onclick = async () => {
   updateBall();
 };
 draw();
+if (openTallExample) notice(tallExampleNotice);
