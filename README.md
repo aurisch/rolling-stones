@@ -4,7 +4,9 @@
 
 Rolling-Stones ist ein geplantes, kindgerecht bedienbares Webspiel: Aus sechseckigen Bauteilen entsteht eine Kugelbahn. Die Kugel bewegt sich nicht automatisch zum Ziel, sondern folgt der Schwerkraft. Reibung, Kurven und Steigungen entscheiden, ob sie ankommt oder unterwegs stehen bleibt.
 
-> **Projektstatus:** Konzeptphase. Diese README dokumentiert die vereinbarten Regeln und geplanten Funktionen; ein spielbarer Editor oder eine Physiksimulation sind noch nicht implementiert.
+Der Browser-Prototyp bietet einen 2D-Baueditor, eine spielbare Beispielbahn, eine vereinfachte Rollsimulation und eine zusätzliche 3D-Ansicht. Zum lokalen Starten im Projektordner `python3 -m http.server 8000` ausführen und `http://localhost:8000` öffnen. Für die 3D-Ansicht benötigt der Browser WebGL und Internetzugriff auf jsDelivr.
+
+Die folgenden Abschnitte beschreiben die Spielregeln und den geplanten Ausbau. Höhenstapel entstehen im Prototyp automatisch beim Anheben von Bahnstücken. Die Brückenprüfung und das Zurückrollen sind noch offen.
 
 ## Spielprinzip
 
@@ -95,7 +97,7 @@ Die Simulation soll nicht künstlich garantieren, dass eine gebaute Bahn funktio
 - Bahnen lokal speichern und später wieder laden
 - Kindgerechte Bedienung ohne erforderliche Lesekenntnisse
 
-**Technischer Vorschlag (noch nicht implementiert):** Vue 3, TypeScript; getrennte Module für Bahnmodell, Validierung, Physik und Darstellung. Eine 2D-Draufsicht hat Vorrang vor einer 3D-Ansicht.
+**Technik:** Der Prototyp läuft mit JavaScript-Modulen ohne Build-Schritt. Baueditor, Simulation und 3D-Ansicht verwenden dasselbe Bahnmodell.
 
 ## Entwicklungsplan
 

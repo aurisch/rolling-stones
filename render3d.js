@@ -1,3 +1,4 @@
+import {center, path, radius as R, rise} from './track.mjs';
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
 const host=document.querySelector('#view3d'),scene=new THREE.Scene();scene.background=new THREE.Color(0xf2f5f7);
 const camera=new THREE.PerspectiveCamera(43,1,.1,3000),renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});
@@ -10,11 +11,6 @@ const mat=(color)=>new THREE.MeshStandardMaterial({color,roughness:.62,metalness
 const beige=mat(0xf7f8f8),edge=mat(0xc6cdd1),support=mat(0xe1e5e8),rail=mat(0x66727c),goal=mat(0x54b27d),start=mat(0x53a9d5),ballMat=new THREE.MeshPhysicalMaterial({color:0xb9c5ce,metalness:1,roughness:.12,clearcoat:1,clearcoatRoughness:.06});
 const railInner=mat(0xe2e6e8),supportDark=mat(0xb4bec5);
 const ballLight=new THREE.PointLight(0xffffff,6,85);scene.add(ballLight);
-const R=36,H=Math.sqrt(3)*R,DX=54,DY=H,ox=52,oy=55;
-const center=(x,y)=>({x:ox+x*DX,y:oy+y*DY+(x%2)*DY/2});
-const point=(c,i)=>({x:c.x+R*Math.cos(Math.PI*i/3),y:c.y+R*Math.sin(Math.PI*i/3)});
-const midpoint=(c,i)=>{let a=point(c,i),b=point(c,(i+1)%6);return{x:(a.x+b.x)/2,y:(a.y+b.y)/2}};
-const ports=t=>t.type==='curve120'?[t.rot,(t.rot+2)%6]:t.type==='curve60'?[t.rot,(t.rot+1)%6]:[t.rot,(t.rot+3)%6];
 const origin={x:330,y:300};
 const world=(p,h)=>new THREE.Vector3(p.x-origin.x,h,origin.y-p.y);
 const floorY=z=>z*15;
@@ -22,35 +18,18 @@ const hexGeo=new THREE.CylinderGeometry(R-1,R-1,1,6,1,false,Math.PI/6);
 const tube=(points,radius,material)=>{let curve=new THREE.CatmullRomCurve3(points);let mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,Math.max(20,points.length*3),radius,10,false),material);mesh.castShadow=true;mesh.receiveShadow=true;objects.add(mesh)};
 let marble=new THREE.Mesh(new THREE.SphereGeometry(8,40,28),ballMat);marble.castShadow=true;scene.add(marble);
 const ballHalo=new THREE.Object3D();scene.add(ballHalo);
-// Geometry model: shared edge ports, continuous centre lines and matched rail offsets.
-const pathCache=new Map();
-function tilePath(x,y,t){
- const c=center(x,y),[a,b]=ports(t),p=midpoint(c,a),q=midpoint(c,b);
- const curved=t.type==='curve60'||t.type==='curve120';
- // Determine ramp direction from adjacent tile heights, not from port order.
- let rampDirection=1;
- if(t.type==='down'||t.type==='up'){
-  const offset=t.type==='down'?-1:1;
-  const neighborAt=side=>{const v=midpoint(c,side),delta={x:v.x-c.x,y:v.y-c.y},other={x:c.x+2*delta.x,y:c.y+2*delta.y};for(const [key,tile] of currentTiles){const [xx,yy]=key.split(',').map(Number),pos=center(xx,yy);if(Math.hypot(pos.x-other.x,pos.y-other.y)<1)return tile}return null};
-  const na=neighborAt(a),nb=neighborAt(b);
-  if(na?.z===t.z+offset&&nb?.z!==t.z+offset)rampDirection=-1;
- }
-
- const pts=[];
- for(let i=0;i<=32;i++){const f=i/32;
- // Each port is the exact midpoint of a shared hex edge.
- const px=curved?(1-f)*(1-f)*p.x+2*(1-f)*f*c.x+f*f*q.x:p.x+(q.x-p.x)*f;
- const py=curved?(1-f)*(1-f)*p.y+2*(1-f)*f*c.y+f*f*q.y:p.y+(q.y-p.y)*f;
- const rampF=rampDirection===1?f:1-f;const h=floorY(t.z)+9+(t.type==='down'?-15*rampF:t.type==='up'?15*rampF:0);
- pts.push(world({x:px,y:py},h));
- }
- return pts;
+function tilePath(x, y, tile) {
+ const { point } = path(x, y, tile);
+ return Array.from({length: 33}, (_, index) => {
+  const p = point(index / 32);
+  return world(p, p.height);
+ });
 }
 function tile(x,y,t){
- const c=center(x,y),height=floorY(t.z);
+ const c=center(x,y),baseLevel=Math.max(0,t.z+Math.min(0,rise(t))),height=floorY(baseLevel);
  const baseMat=t.type==='end'?goal:(x===1&&y===3)?start:beige;
  if(t.type==='support'){const block=new THREE.Mesh(new THREE.CylinderGeometry(15,15,3,6,1,false,Math.PI/6),support);block.position.copy(world(c,height+2));objects.add(block);return}
- for(let j=0;j<t.z;j++){
+ for(let j=0;j<baseLevel;j++){
   const pillar=new THREE.Mesh(new THREE.CylinderGeometry(7,8,14,8),support);pillar.position.copy(world(c,j*15+7));pillar.castShadow=true;objects.add(pillar);
   const collar=new THREE.Mesh(new THREE.CylinderGeometry(9,9,2,8),supportDark);collar.position.copy(world(c,j*15+14));objects.add(collar);
  }
@@ -59,7 +38,6 @@ function tile(x,y,t){
  const outline=new THREE.Mesh(new THREE.CylinderGeometry(R-2,R-2,1,6,1,false,Math.PI/6),edge);
  outline.position.copy(world(c,height+.5));objects.add(outline);
  const pts=tilePath(x,y,t);
- pathCache.set(x+','+y,pts);
  // Paired rails use the same centreline and perpendicular at every sample.
  const left=[],right=[];
  for(let i=0;i<pts.length;i++){
@@ -78,9 +56,22 @@ function tile(x,y,t){
  }
 }
 let currentTiles=new Map(),currentBall=null;
-function rebuild(){pathCache.clear();while(objects.children.length){let o=objects.children[0];objects.remove(o);o.traverse?.(n=>{if(n.geometry&&n.geometry!==hexGeo)n.geometry.dispose()})}for(let [k,t] of currentTiles){let [x,y]=k.split(',').map(Number);tile(x,y,t)}updateBall();if(!walkMode&&currentTiles.size)resetCamera()}
-function updateBall(){marble.visible=true;if(currentBall){marble.position.copy(world(currentBall,(currentBall.height??(floorY(currentBall.z||0)+21))-5))}else{let t=currentTiles.get('1,3');marble.position.copy(world(center(1,3),t?floorY(t.z)+16:16))}ballHalo.position.copy(marble.position);ballLight.position.copy(marble.position)}
-window.addEventListener('rolling-update',e=>{const d=e.detail;currentBall=d.ball;const incoming=JSON.stringify(d.tiles);if(incoming!==window.__rollingTiles3D){window.__rollingTiles3D=incoming;currentTiles=new Map(d.tiles);rebuild()}else updateBall()});
+function rebuild(){while(objects.children.length){let o=objects.children[0];objects.remove(o);o.traverse?.(n=>{if(n.geometry&&n.geometry!==hexGeo)n.geometry.dispose()})}for(let [k,t] of currentTiles){let [x,y]=k.split(',').map(Number);tile(x,y,t)}updateBall();if(!walkMode&&currentTiles.size)resetCamera()}
+function updateBall() {
+ marble.position.copy(world(currentBall, currentBall.height + 10));
+ ballHalo.position.copy(marble.position);
+ ballLight.position.copy(marble.position);
+}
+let previousTiles;
+window.addEventListener('rolling-update', ({detail}) => {
+ currentBall = detail.ball;
+ const incoming = JSON.stringify([...detail.tiles]);
+ if (incoming !== previousTiles) {
+  previousTiles = incoming;
+  currentTiles = detail.tiles;
+  rebuild();
+ } else updateBall();
+});
 let azimuth=-.7,elevation=.9,distance=760,target=new THREE.Vector3(0,0,0);
 const initial={azimuth,elevation,distance};
 function positionCamera(){camera.position.set(target.x+distance*Math.sin(azimuth)*Math.cos(elevation),target.y+distance*Math.sin(elevation),target.z+distance*Math.cos(azimuth)*Math.cos(elevation));camera.lookAt(target)}
