@@ -22,21 +22,54 @@ const hexGeo=new THREE.CylinderGeometry(R-1,R-1,1,6,1,false,Math.PI/6);
 const tube=(points,radius,material)=>{let curve=new THREE.CatmullRomCurve3(points);let mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,Math.max(20,points.length*3),radius,10,false),material);mesh.castShadow=true;mesh.receiveShadow=true;objects.add(mesh)};
 let marble=new THREE.Mesh(new THREE.SphereGeometry(8,40,28),ballMat);marble.castShadow=true;scene.add(marble);
 const ballHalo=new THREE.Object3D();scene.add(ballHalo);
+// Geometry model: shared edge ports, continuous centre lines and matched rail offsets.
+const pathCache=new Map();
+function tilePath(x,y,t){
+ const c=center(x,y),[a,b]=ports(t),p=midpoint(c,a),q=midpoint(c,b);
+ const curved=t.type==='curve60'||t.type==='curve120';
+ const pts=[];
+ for(let i=0;i<=32;i++){const f=i/32;
+ // Each port is the exact midpoint of a shared hex edge.
+ const px=curved?(1-f)*(1-f)*p.x+2*(1-f)*f*c.x+f*f*q.x:p.x+(q.x-p.x)*f;
+ const py=curved?(1-f)*(1-f)*p.y+2*(1-f)*f*c.y+f*f*q.y:p.y+(q.y-p.y)*f;
+ const h=floorY(t.z)+9+(t.type==='down'?-15*f:t.type==='up'?15*f:0);
+ pts.push(world({x:px,y:py},h));
+ }
+ return pts;
+}
 function tile(x,y,t){
-let c=center(x,y),height=floorY(t.z),m=t.type==='end'?goal:t.type==='down'?start:beige;
-if(t.type==='support'){let base=new THREE.Mesh(hexGeo,support);base.position.copy(world(c,height-2));base.scale.y=12;base.castShadow=true;objects.add(base);return}
-for(let j=0;j<t.z;j++){let pillar=new THREE.Mesh(new THREE.CylinderGeometry(7,9,14,8),support);pillar.position.copy(world(c,j*15+7));pillar.castShadow=true;pillar.receiveShadow=true;objects.add(pillar);let collar=new THREE.Mesh(new THREE.CylinderGeometry(10,10,2,8),supportDark);collar.position.copy(world(c,j*15+13));objects.add(collar)}
-let block=new THREE.Mesh(hexGeo,m);block.position.copy(world(c,height+2));block.scale.y=4;block.castShadow=true;block.receiveShadow=true;objects.add(block);
-let rim=new THREE.Mesh(new THREE.CylinderGeometry(R-1,R-1,2,6,1,false,Math.PI/6),edge);rim.position.copy(world(c,height+4));rim.castShadow=true;objects.add(rim);
-let top=new THREE.Mesh(new THREE.CylinderGeometry(R-3,R-3,1.5,6,1,false,Math.PI/6),m);top.position.copy(world(c,height+5.5));top.receiveShadow=true;objects.add(top);
-let [a,b]=ports(t),p=midpoint(c,a),q=midpoint(c,b),isCurve=t.type==='curve120'||t.type==='curve60';
-let points=[],left=[],right=[];for(let k=0;k<=24;k++){let f=k/24;let xx=isCurve?(1-f)*(1-f)*p.x+2*(1-f)*f*c.x+f*f*q.x:p.x+(q.x-p.x)*f;let yy=isCurve?(1-f)*(1-f)*p.y+2*(1-f)*f*c.y+f*f*q.y:p.y+(q.y-p.y)*f;let dx=isCurve?2*(1-f)*(c.x-p.x)+2*f*(q.x-c.x):q.x-p.x,dy=isCurve?2*(1-f)*(c.y-p.y)+2*f*(q.y-c.y):q.y-p.y;let len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;let h=height+8+(t.type==='down'?-15*f:t.type==='up'?15*f:0);points.push(world({x:xx,y:yy},h-1));left.push(world({x:xx+nx*9,y:yy+ny*9},h+3));right.push(world({x:xx-nx*9,y:yy-ny*9},h+3))}
-tube(points,6,t.type==='end'?goal:railInner);tube(left,2.2,t.type==='end'?goal:rail);tube(right,2.2,t.type==='end'?goal:rail);
-if(t.type==='end'){let ring=new THREE.Mesh(new THREE.TorusGeometry(13,3,8,32),goal);ring.rotation.x=-Math.PI/2;ring.position.copy(world(c,height+11));objects.add(ring)}
-if(x===1&&y===3){let ring=new THREE.Mesh(new THREE.TorusGeometry(13,3,8,32),start);ring.rotation.x=-Math.PI/2;ring.position.copy(world(c,height+16));objects.add(ring)}
+ const c=center(x,y),height=floorY(t.z);
+ const baseMat=t.type==='end'?goal:(x===1&&y===3)?start:beige;
+ if(t.type==='support'){const block=new THREE.Mesh(new THREE.CylinderGeometry(15,15,3,6,1,false,Math.PI/6),support);block.position.copy(world(c,height+2));objects.add(block);return}
+ for(let j=0;j<t.z;j++){
+  const pillar=new THREE.Mesh(new THREE.CylinderGeometry(7,8,14,8),support);pillar.position.copy(world(c,j*15+7));pillar.castShadow=true;objects.add(pillar);
+  const collar=new THREE.Mesh(new THREE.CylinderGeometry(9,9,2,8),supportDark);collar.position.copy(world(c,j*15+14));objects.add(collar);
+ }
+ const block=new THREE.Mesh(new THREE.CylinderGeometry(R-2,R-2,4,6,1,false,Math.PI/6),baseMat);
+ block.position.copy(world(c,height+2));block.castShadow=true;block.receiveShadow=true;objects.add(block);
+ const outline=new THREE.Mesh(new THREE.CylinderGeometry(R-2,R-2,1,6,1,false,Math.PI/6),edge);
+ outline.position.copy(world(c,height+.5));objects.add(outline);
+ const pts=tilePath(x,y,t);
+ pathCache.set(x+','+y,pts);
+ // Paired rails use the same centreline and perpendicular at every sample.
+ const left=[],right=[];
+ for(let i=0;i<pts.length;i++){
+  const prev=pts[Math.max(0,i-1)],next=pts[Math.min(pts.length-1,i+1)];
+  const dx=next.x-prev.x,dz=next.z-prev.z,len=Math.hypot(dx,dz)||1;
+  const nx=-dz/len,nz=dx/len;
+  left.push(new THREE.Vector3(pts[i].x+nx*7,pts[i].y+2,pts[i].z+nz*7));
+  right.push(new THREE.Vector3(pts[i].x-nx*7,pts[i].y+2,pts[i].z-nz*7));
+ }
+ tube(pts,4.7,railInner);
+ tube(left,2.2,t.type==='end'?goal:rail);
+ tube(right,2.2,t.type==='end'?goal:rail);
+ if(t.type==='end'||(x===1&&y===3)){
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(11,2,8,32),t.type==='end'?goal:start);
+  ring.rotation.x=-Math.PI/2;ring.position.copy(world(c,height+9));objects.add(ring);
+ }
 }
 let currentTiles=new Map(),currentBall=null;
-function rebuild(){while(objects.children.length){let o=objects.children[0];objects.remove(o);o.traverse?.(n=>{if(n.geometry&&n.geometry!==hexGeo)n.geometry.dispose()})}for(let [k,t] of currentTiles){let [x,y]=k.split(',').map(Number);tile(x,y,t)}updateBall();if(!walkMode&&currentTiles.size)resetCamera()}
+function rebuild(){pathCache.clear();while(objects.children.length){let o=objects.children[0];objects.remove(o);o.traverse?.(n=>{if(n.geometry&&n.geometry!==hexGeo)n.geometry.dispose()})}for(let [k,t] of currentTiles){let [x,y]=k.split(',').map(Number);tile(x,y,t)}updateBall();if(!walkMode&&currentTiles.size)resetCamera()}
 function updateBall(){marble.visible=true;if(currentBall){marble.position.copy(world(currentBall,(currentBall.height??(floorY(currentBall.z||0)+21))-5))}else{let t=currentTiles.get('1,3');marble.position.copy(world(center(1,3),t?floorY(t.z)+16:16))}ballHalo.position.copy(marble.position);ballLight.position.copy(marble.position)}
 window.addEventListener('rolling-update',e=>{const d=e.detail;currentBall=d.ball;const incoming=JSON.stringify(d.tiles);if(incoming!==window.__rollingTiles3D){window.__rollingTiles3D=incoming;currentTiles=new Map(d.tiles);rebuild()}else updateBall()});
 let azimuth=-.7,elevation=.9,distance=760,target=new THREE.Vector3(0,0,0);
