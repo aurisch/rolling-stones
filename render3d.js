@@ -1,13 +1,15 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
-const host=document.querySelector('#view3d'),scene=new THREE.Scene();scene.background=new THREE.Color(0xdcecf9);
+const host=document.querySelector('#view3d'),scene=new THREE.Scene();scene.background=new THREE.Color(0xe8f2fb);
 const camera=new THREE.PerspectiveCamera(43,1,.1,3000),renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;host.append(renderer.domElement);
-scene.add(new THREE.HemisphereLight(0xffffff,0x738398,2.2));
-const sun=new THREE.DirectionalLight(0xffffff,2.3);sun.position.set(-140,280,180);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-600;sun.shadow.camera.right=600;sun.shadow.camera.top=600;sun.shadow.camera.bottom=-600;scene.add(sun);
-const ground=new THREE.Mesh(new THREE.PlaneGeometry(1400,1100),new THREE.MeshStandardMaterial({color:0xcbdfe9,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-9;ground.receiveShadow=true;scene.add(ground);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.25;host.append(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x9aadc3,2.5));
+const sun=new THREE.DirectionalLight(0xffefd8,2.8);sun.position.set(-140,280,180);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-600;sun.shadow.camera.right=600;sun.shadow.camera.top=600;sun.shadow.camera.bottom=-600;scene.add(sun);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(1400,1100),new THREE.MeshStandardMaterial({color:0xd8e5e8,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-9;ground.receiveShadow=true;scene.add(ground);
 const objects=new THREE.Group();scene.add(objects);
 const mat=(color)=>new THREE.MeshStandardMaterial({color,roughness:.62,metalness:.04});
-const beige=mat(0xe4bd86),edge=mat(0xb58b5c),support=mat(0x8799ab),rail=mat(0x2477bf),goal=mat(0x52ad74),start=mat(0xe4a64a),ballMat=new THREE.MeshStandardMaterial({color:0x2a65e6,metalness:.25,roughness:.15,emissive:0x153c8c,emissiveIntensity:.3});
+const beige=mat(0xf1cf99),edge=mat(0xa87949),support=mat(0x8da4b4),rail=mat(0x2676b9),goal=mat(0x43a773),start=mat(0xe7a64c),ballMat=new THREE.MeshPhysicalMaterial({color:0x236aff,metalness:.45,roughness:.13,clearcoat:1,clearcoatRoughness:.07,emissive:0x123c88,emissiveIntensity:.2});
+const railInner=mat(0xe8f4ff),supportDark=mat(0x647e93);
+const ballLight=new THREE.PointLight(0x76b6ff,24,110);scene.add(ballLight);
 const R=36,H=Math.sqrt(3)*R,DX=54,DY=H,ox=52,oy=55;
 const center=(x,y)=>({x:ox+x*DX,y:oy+y*DY+(x%2)*DY/2});
 const point=(c,i)=>({x:c.x+R*Math.cos(Math.PI*i/3),y:c.y+R*Math.sin(Math.PI*i/3)});
@@ -16,20 +18,26 @@ const ports=t=>t.type==='curve120'?[t.rot,(t.rot+2)%6]:t.type==='curve60'?[t.rot
 const origin={x:330,y:300};
 const world=(p,h)=>new THREE.Vector3(p.x-origin.x,h,origin.y-p.y);
 const floorY=z=>z*15;
-const hexGeo=new THREE.CylinderGeometry(R,R,6,6,1,false,Math.PI/6);
-const tube=(points,radius,material)=>{let curve=new THREE.CatmullRomCurve3(points);let mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,Math.max(12,points.length*3),radius,8,false),material);mesh.castShadow=true;objects.add(mesh)};
-let marble=new THREE.Mesh(new THREE.SphereGeometry(11,24,16),ballMat);marble.castShadow=true;scene.add(marble);
-function tile(x,y,t){let c=center(x,y),height=floorY(t.z),m=t.type==='end'?goal:t.type==='down'?start:beige;
-if(t.type==='support'){let base=new THREE.Mesh(hexGeo,support);base.position.copy(world(c,height-2));base.scale.y=5;base.castShadow=true;objects.add(base);return}
-for(let j=0;j<t.z;j++){let block=new THREE.Mesh(hexGeo,support);block.position.copy(world(c,j*15-1));block.scale.y=13;block.castShadow=true;block.receiveShadow=true;objects.add(block)}
-let block=new THREE.Mesh(hexGeo,m);block.position.copy(world(c,height+5));block.scale.y=9;block.castShadow=true;block.receiveShadow=true;objects.add(block);
+const hexGeo=new THREE.CylinderGeometry(R-1,R-1,1,6,1,false,Math.PI/6);
+const tube=(points,radius,material)=>{let curve=new THREE.CatmullRomCurve3(points);let mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,Math.max(20,points.length*3),radius,10,false),material);mesh.castShadow=true;mesh.receiveShadow=true;objects.add(mesh)};
+let marble=new THREE.Mesh(new THREE.SphereGeometry(10,40,28),ballMat);marble.castShadow=true;scene.add(marble);
+const ballHalo=new THREE.Mesh(new THREE.SphereGeometry(13,24,16),new THREE.MeshBasicMaterial({color:0x5caaff,transparent:true,opacity:.14,depthWrite:false}));scene.add(ballHalo);
+function tile(x,y,t){
+let c=center(x,y),height=floorY(t.z),m=t.type==='end'?goal:t.type==='down'?start:beige;
+if(t.type==='support'){let base=new THREE.Mesh(hexGeo,support);base.position.copy(world(c,height-2));base.scale.y=12;base.castShadow=true;objects.add(base);return}
+for(let j=0;j<t.z;j++){let pillar=new THREE.Mesh(new THREE.CylinderGeometry(7,9,14,8),support);pillar.position.copy(world(c,j*15+7));pillar.castShadow=true;pillar.receiveShadow=true;objects.add(pillar);let collar=new THREE.Mesh(new THREE.CylinderGeometry(10,10,2,8),supportDark);collar.position.copy(world(c,j*15+13));objects.add(collar)}
+let block=new THREE.Mesh(hexGeo,m);block.position.copy(world(c,height+5));block.scale.y=10;block.castShadow=true;block.receiveShadow=true;objects.add(block);
+let rim=new THREE.Mesh(new THREE.CylinderGeometry(R-1,R-1,2,6,1,false,Math.PI/6),edge);rim.position.copy(world(c,height+10));rim.castShadow=true;objects.add(rim);
+let top=new THREE.Mesh(new THREE.CylinderGeometry(R-3,R-3,1.5,6,1,false,Math.PI/6),m);top.position.copy(world(c,height+11.5));top.receiveShadow=true;objects.add(top);
 let [a,b]=ports(t),p=midpoint(c,a),q=midpoint(c,b),isCurve=t.type==='curve120'||t.type==='curve60';
-let points=[];for(let k=0;k<=18;k++){let f=k/18;let xx=isCurve?(1-f)*(1-f)*p.x+2*(1-f)*f*c.x+f*f*q.x:p.x+(q.x-p.x)*f;let yy=isCurve?(1-f)*(1-f)*p.y+2*(1-f)*f*c.y+f*f*q.y:p.y+(q.y-p.y)*f;let h=height+12+(t.type==='down'?-15*f:t.type==='up'?15*f:0);points.push(world({x:xx,y:yy},h))}
-tube(points,3,t.type==='end'?goal:rail);
+let points=[],left=[],right=[];for(let k=0;k<=24;k++){let f=k/24;let xx=isCurve?(1-f)*(1-f)*p.x+2*(1-f)*f*c.x+f*f*q.x:p.x+(q.x-p.x)*f;let yy=isCurve?(1-f)*(1-f)*p.y+2*(1-f)*f*c.y+f*f*q.y:p.y+(q.y-p.y)*f;let dx=isCurve?2*(1-f)*(c.x-p.x)+2*f*(q.x-c.x):q.x-p.x,dy=isCurve?2*(1-f)*(c.y-p.y)+2*f*(q.y-c.y):q.y-p.y;let len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;let h=height+13+(t.type==='down'?-15*f:t.type==='up'?15*f:0);points.push(world({x:xx,y:yy},h-1));left.push(world({x:xx+nx*9,y:yy+ny*9},h+3));right.push(world({x:xx-nx*9,y:yy-ny*9},h+3))}
+tube(points,7,t.type==='end'?goal:railInner);tube(left,2.6,t.type==='end'?goal:rail);tube(right,2.6,t.type==='end'?goal:rail);
+if(t.type==='end'){let ring=new THREE.Mesh(new THREE.TorusGeometry(13,3,8,32),goal);ring.rotation.x=-Math.PI/2;ring.position.copy(world(c,height+16));objects.add(ring)}
+if(x===1&&y===3){let ring=new THREE.Mesh(new THREE.TorusGeometry(13,3,8,32),start);ring.rotation.x=-Math.PI/2;ring.position.copy(world(c,height+16));objects.add(ring)}
 }
 let currentTiles=new Map(),currentBall=null;
-function rebuild(){while(objects.children.length){let o=objects.children[0];objects.remove(o);o.traverse?.(n=>{n.geometry?.dispose?.()})}for(let [k,t] of currentTiles){let [x,y]=k.split(',').map(Number);tile(x,y,t)}updateBall()}
-function updateBall(){if(currentBall){marble.visible=true;marble.position.copy(world(currentBall,currentBall.height??(floorY(currentBall.z||0)+21)))}else{marble.visible=true;let t=currentTiles.get('1,3');marble.position.copy(world(center(1,3),t?floorY(t.z)+21:20))}}
+function rebuild(){while(objects.children.length){let o=objects.children[0];objects.remove(o);o.traverse?.(n=>{if(n.geometry&&n.geometry!==hexGeo)n.geometry.dispose()})}for(let [k,t] of currentTiles){let [x,y]=k.split(',').map(Number);tile(x,y,t)}updateBall()}
+function updateBall(){marble.visible=true;if(currentBall){marble.position.copy(world(currentBall,currentBall.height??(floorY(currentBall.z||0)+23)))}else{let t=currentTiles.get('1,3');marble.position.copy(world(center(1,3),t?floorY(t.z)+23:23))}ballHalo.position.copy(marble.position);ballLight.position.copy(marble.position)}
 window.addEventListener('rolling-update',e=>{const d=e.detail;currentBall=d.ball;const incoming=JSON.stringify(d.tiles);if(incoming!==window.__rollingTiles3D){window.__rollingTiles3D=incoming;currentTiles=new Map(d.tiles);rebuild()}else updateBall()});
 let azimuth=-.7,elevation=.9,distance=760,target=new THREE.Vector3(0,0,0);
 const initial={azimuth,elevation,distance};
