@@ -7,7 +7,7 @@ const sun=new THREE.DirectionalLight(0xffffff,2.3);sun.position.set(-140,280,180
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(1400,1100),new THREE.MeshStandardMaterial({color:0xcbdfe9,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-9;ground.receiveShadow=true;scene.add(ground);
 const objects=new THREE.Group();scene.add(objects);
 const mat=(color)=>new THREE.MeshStandardMaterial({color,roughness:.62,metalness:.04});
-const beige=mat(0xe4bd86),edge=mat(0xb58b5c),support=mat(0x8799ab),rail=mat(0x2477bf),goal=mat(0x52ad74),start=mat(0xe4a64a),ballMat=new THREE.MeshStandardMaterial({color:0x2a65e6,metalness:.65,roughness:.19});
+const beige=mat(0xe4bd86),edge=mat(0xb58b5c),support=mat(0x8799ab),rail=mat(0x2477bf),goal=mat(0x52ad74),start=mat(0xe4a64a),ballMat=new THREE.MeshStandardMaterial({color:0x2a65e6,metalness:.25,roughness:.15,emissive:0x153c8c,emissiveIntensity:.3});
 const R=36,H=Math.sqrt(3)*R,DX=54,DY=H,ox=52,oy=55;
 const center=(x,y)=>({x:ox+x*DX,y:oy+y*DY+(x%2)*DY/2});
 const point=(c,i)=>({x:c.x+R*Math.cos(Math.PI*i/3),y:c.y+R*Math.sin(Math.PI*i/3)});
@@ -18,7 +18,7 @@ const world=(p,h)=>new THREE.Vector3(p.x-origin.x,h,origin.y-p.y);
 const floorY=z=>z*15;
 const hexGeo=new THREE.CylinderGeometry(R,R,6,6,1,false,Math.PI/6);
 const tube=(points,radius,material)=>{let curve=new THREE.CatmullRomCurve3(points);let mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,Math.max(12,points.length*3),radius,8,false),material);mesh.castShadow=true;objects.add(mesh)};
-let marble=new THREE.Mesh(new THREE.SphereGeometry(9,24,16),ballMat);marble.castShadow=true;scene.add(marble);
+let marble=new THREE.Mesh(new THREE.SphereGeometry(11,24,16),ballMat);marble.castShadow=true;scene.add(marble);
 function tile(x,y,t){let c=center(x,y),height=floorY(t.z),m=t.type==='end'?goal:t.type==='down'?start:beige;
 if(t.type==='support'){let base=new THREE.Mesh(hexGeo,support);base.position.copy(world(c,height-2));base.scale.y=5;base.castShadow=true;objects.add(base);return}
 for(let j=0;j<t.z;j++){let block=new THREE.Mesh(hexGeo,support);block.position.copy(world(c,j*15-1));block.scale.y=13;block.castShadow=true;block.receiveShadow=true;objects.add(block)}
@@ -29,7 +29,7 @@ tube(points,3,t.type==='end'?goal:rail);
 }
 let currentTiles=new Map(),currentBall=null;
 function rebuild(){while(objects.children.length){let o=objects.children[0];objects.remove(o);o.traverse?.(n=>{n.geometry?.dispose?.()})}for(let [k,t] of currentTiles){let [x,y]=k.split(',').map(Number);tile(x,y,t)}updateBall()}
-function updateBall(){if(currentBall){marble.visible=true;marble.position.copy(world(currentBall,18))}else{marble.visible=true;let t=currentTiles.get('1,3');marble.position.copy(world(center(1,3),t?floorY(t.z)+24:20))}}
+function updateBall(){if(currentBall){marble.visible=true;marble.position.copy(world(currentBall,currentBall.height??(floorY(currentBall.z||0)+21)))}else{marble.visible=true;let t=currentTiles.get('1,3');marble.position.copy(world(center(1,3),t?floorY(t.z)+21:20))}}
 window.addEventListener('rolling-update',e=>{const d=e.detail;currentBall=d.ball;const incoming=JSON.stringify(d.tiles);if(incoming!==window.__rollingTiles3D){window.__rollingTiles3D=incoming;currentTiles=new Map(d.tiles);rebuild()}else updateBall()});
 let azimuth=-.7,elevation=.9,distance=760,target=new THREE.Vector3(0,0,0);
 const initial={azimuth,elevation,distance};
@@ -50,6 +50,9 @@ const stick=document.createElement('div');Object.assign(stick.style,{position:'a
 function setWalk(active){walkMode=active;walkButton.textContent=active?'🧊 Tischansicht':'🚶 Rundgang';joystick.style.display=active?'block':'none';pad.style.display=active?'none':'flex';help.textContent=active?'Links: laufen · Rechts: umsehen':'1 Finger: Tisch verschieben · 2 Finger: drehen & zoomen';moveX=moveY=0;if(active){walkPos.set(-250,34,230);walkYaw=-.7;walkPitch=0;updateWalkCamera()}else resetCamera()}
 function updateWalkCamera(){camera.position.copy(walkPos);camera.lookAt(walkPos.x+Math.sin(walkYaw)*Math.cos(walkPitch),walkPos.y+Math.sin(walkPitch),walkPos.z-Math.cos(walkYaw)*Math.cos(walkPitch))}
 walkButton.onclick=()=>setWalk(!walkMode);
+const findBall=document.createElement('button');findBall.textContent='🔵 Kugel finden';Object.assign(findBall.style,{position:'absolute',right:'10px',top:'106px',padding:'10px',background:'rgba(255,255,255,.96)',font:'14px system-ui'});host.append(findBall);
+findBall.onclick=()=>{let p=marble.position;if(walkMode){walkPos.set(p.x+110,Math.max(34,p.y+45),p.z+120);walkYaw=Math.atan2(p.x-walkPos.x,-(p.z-walkPos.z));walkPitch=Math.atan2(p.y-walkPos.y,Math.hypot(p.x-walkPos.x,p.z-walkPos.z));updateWalkCamera()}else{target.copy(p);distance=270;positionCamera()}};
+
 home.onclick=()=>{if(walkMode)setWalk(true);else resetCamera()};
 let joyId=null;
 function moveStick(e){const rect=joystick.getBoundingClientRect(),cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;moveX=Math.max(-1,Math.min(1,(e.clientX-cx)/43));moveY=Math.max(-1,Math.min(1,(cy-e.clientY)/43));const l=Math.hypot(moveX,moveY);if(l>1){moveX/=l;moveY/=l}stick.style.transform='translate('+moveX*37+'px,'+(-moveY*37)+'px)'}
