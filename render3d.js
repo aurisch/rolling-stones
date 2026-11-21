@@ -32,11 +32,18 @@ function rebuild(){while(objects.children.length){let o=objects.children[0];obje
 function updateBall(){if(currentBall){marble.visible=true;marble.position.copy(world(currentBall,18))}else{marble.visible=true;let t=currentTiles.get('1,3');marble.position.copy(world(center(1,3),t?floorY(t.z)+24:20))}}
 window.addEventListener('rolling-update',e=>{const d=e.detail;currentBall=d.ball;const incoming=JSON.stringify(d.tiles);if(incoming!==window.__rollingTiles3D){window.__rollingTiles3D=incoming;currentTiles=new Map(d.tiles);rebuild()}else updateBall()});
 let azimuth=-.7,elevation=.9,distance=760,target=new THREE.Vector3(0,0,0);
+const initial={azimuth,elevation,distance};
 function positionCamera(){camera.position.set(target.x+distance*Math.sin(azimuth)*Math.cos(elevation),target.y+distance*Math.sin(elevation),target.z+distance*Math.cos(azimuth)*Math.cos(elevation));camera.lookAt(target)}
+function pan(dx,dy){const factor=distance/650;const right=new THREE.Vector3(Math.cos(azimuth),0,-Math.sin(azimuth));const forward=new THREE.Vector3(Math.sin(azimuth),0,Math.cos(azimuth));target.addScaledVector(right,-dx*factor);target.addScaledVector(forward,dy*factor);positionCamera()}
+function resetCamera(){azimuth=initial.azimuth;elevation=initial.elevation;distance=initial.distance;target.set(0,0,0);positionCamera()}
 positionCamera();
-let active=new Map(),lastDist=0;
-host.addEventListener('pointerdown',e=>{host.setPointerCapture(e.pointerId);active.set(e.pointerId,{x:e.clientX,y:e.clientY})});
-host.addEventListener('pointermove',e=>{if(!active.has(e.pointerId))return;let prev=active.get(e.pointerId);active.set(e.pointerId,{x:e.clientX,y:e.clientY});if(active.size===1){azimuth-=(e.clientX-prev.x)*.008;elevation=Math.max(.12,Math.min(1.52,elevation+(e.clientY-prev.y)*.006));positionCamera()}else if(active.size===2){let p=[...active.values()],dist=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);if(lastDist)distance=Math.max(180,Math.min(1500,distance*lastDist/dist));lastDist=dist;positionCamera()}});
-for(let type of ['pointerup','pointercancel'])host.addEventListener(type,e=>{active.delete(e.pointerId);lastDist=0});
-host.addEventListener('wheel',e=>{e.preventDefault();distance=Math.max(180,Math.min(1500,distance*Math.exp(e.deltaY*.001)));positionCamera()},{passive:false});
+host.style.position='relative';
+const help=document.createElement('div');help.textContent='1 Finger: drehen · 2 Finger: verschieben & zoomen';Object.assign(help.style,{position:'absolute',left:'10px',bottom:'10px',background:'rgba(255,255,255,.85)',borderRadius:'9px',padding:'7px 10px',font:'12px system-ui',pointerEvents:'none',color:'#19334f'});host.append(help);
+const home=document.createElement('button');home.textContent='⌂ Ansicht zurücksetzen';Object.assign(home.style,{position:'absolute',right:'10px',top:'10px',padding:'9px',background:'rgba(255,255,255,.93)',font:'13px system-ui'});home.onclick=resetCamera;host.append(home);
+let active=new Map(),lastDist=0,lastMid=null;
+host.addEventListener('pointerdown',e=>{if(e.target!==renderer.domElement)return;host.setPointerCapture(e.pointerId);active.set(e.pointerId,{x:e.clientX,y:e.clientY});lastDist=0;lastMid=null});
+host.addEventListener('pointermove',e=>{if(!active.has(e.pointerId))return;let prev=active.get(e.pointerId);active.set(e.pointerId,{x:e.clientX,y:e.clientY});if(active.size===1){if(e.shiftKey||e.buttons===2){pan(e.clientX-prev.x,e.clientY-prev.y)}else{azimuth-=(e.clientX-prev.x)*.008;elevation=Math.max(.12,Math.min(1.52,elevation+(e.clientY-prev.y)*.006));positionCamera()}}else if(active.size===2){let p=[...active.values()],dist=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y),mid={x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2};if(lastMid)pan(mid.x-lastMid.x,mid.y-lastMid.y);if(lastDist)distance=Math.max(90,Math.min(1800,distance*lastDist/dist));lastDist=dist;lastMid=mid;positionCamera()}});
+for(let type of ['pointerup','pointercancel','lostpointercapture'])host.addEventListener(type,e=>{active.delete(e.pointerId);lastDist=0;lastMid=null});
+host.addEventListener('contextmenu',e=>e.preventDefault());
+host.addEventListener('wheel',e=>{e.preventDefault();if(e.shiftKey)pan(e.deltaX,e.deltaY);else{distance=Math.max(90,Math.min(1800,distance*Math.exp(e.deltaY*.001)));positionCamera()}},{passive:false});
 function animate(){requestAnimationFrame(animate);if(host.classList.contains('active')){let w=host.clientWidth,h=host.clientHeight;if(w&&h&&(renderer.domElement.width!==Math.round(w*renderer.getPixelRatio())||renderer.domElement.height!==Math.round(h*renderer.getPixelRatio()))){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}renderer.render(scene,camera)}}animate();
